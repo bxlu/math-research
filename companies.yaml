@@ -1,0 +1,148 @@
+# companies.yaml -- RESEARCH search (C:\Projects\Research)
+#
+# Every greenhouse token below was verified on 2026-09-14 by calling
+# https://boards-api.greenhouse.io/v1/boards/<token>/jobs and reading the
+# returned titles. The count and the quoted title after each entry are from
+# that live response -- nothing here is a guessed token. Tokens that 404'd
+# (hudsonrivertrading, axqcap) and stub boards with no real postings
+# (exoduspoint, 2 placeholder entries) were dropped.
+#
+# Summer 2027 PhD internship postings are already open across most of these
+# boards as of 2026-09-14, so the first collect run should land on live
+# applications rather than an empty corpus.
+
+greenhouse:
+# --- quant: boards with a confirmed PhD-track research internship -----------
+- wehrtyou                            # Hudson River Trading, 74 jobs
+                                      # "Algorithm Development (Quant Research & Trading) PhD Internship - Summer 2027"
+- virtu                               # Virtu Financial, 50 jobs
+                                      # "2027 Internship - Quantitative Researcher (PhD)"
+- optiverus                           # Optiver US, 120 jobs
+                                      # "Graduate Quantitative Researcher, PhD (2027 Start)"
+- icml                                # Optiver's ICML conference board, 2 jobs
+                                      # "Quantitative Research Intern, PhD (Summer 2027)"
+- jumptrading                         # Jump Trading, 107 jobs
+                                      # "Campus Quantitative Researcher, PhD (Intern)"
+- drweng                              # DRW, 150 jobs
+                                      # "Quantitative Research Intern" (x3), "AI/ML Research Intern"
+- worldquant                          # WorldQuant, 102 jobs
+                                      # "Quantitative Research Internship 2027"
+- imc                                 # IMC, 100 jobs
+                                      # "Graduate Quantitative Researcher (PhD)"
+- point72                             # Point72 / Cubist, 180 jobs
+                                      # "Cubist Quantitative Researcher Intern", "Machine Learning Researcher - Intern"
+- schonfeld                           # Schonfeld, 55 jobs
+                                      # "2026 BSc/MSc/PhD Quantitative Research/Strat Internship"
+- fiveringsllc                        # Five Rings, 16 jobs
+                                      # "Summer Intern 2027 - Quantitative Researcher (PhD)"
+- squarepointcapital                  # Squarepoint, 93 jobs
+                                      # "Intern Quant Researcher"
+- mwinternshipprogram                 # Marshall Wace internships, 7 jobs
+                                      # "Quant Research Intern - London - 2027"
+- walleyecapital-external-students    # Walleye Capital, 4 jobs
+                                      # "Quantic - PhD Quantitative Researcher Intern (Summer 2027)"
+- aquaticcapitalmanagement            # Aquatic Capital Management, 8 jobs
+                                      # "Quantitative Researcher, Intern (Summer 2027)", "Quantitative Researcher, PhD"
+- xantium                             # Xantium, 8 jobs
+                                      # "Quantitative Researcher Intern"
+- vaticlabs                           # Vatic Labs, 9 jobs
+                                      # "AI Research Internship (UAE)"
+# --- quant: live board, no internship posted at verification time ----------
+- marshallwace                        # Marshall Wace main board, 1 job
+                                      # kept so postings land here when the main board fills
+# --- research institutes ---------------------------------------------------
+- thealleninstitute                   # Allen Institute for AI, 22 jobs
+                                      # research scientist/engineer roles; posts
+                                      # "Research Internship, <team>" seasonally
+
+workday:
+# Verified from live myworkdayjobs URLs (host + site path), NOT from the cxs
+# API -- that endpoint needs a POST, which could not be issued from here. The
+# first collect run confirms them: a wrong host or site logs a fetch error and
+# zero postings for that token, and nothing else in the DB is affected.
+#
+# The `search:` key below is INERT unless you apply the one-line change in
+# fetch_workday (see notes) -- collect.py currently hardcodes searchText "".
+# Left in place because these are large boards: MITRE and Draper are mostly
+# non-research engineering roles, and a server-side query is far cheaper than
+# pulling the whole board and rejecting it locally.
+# MITRE removed from workday 2026-09-14 -- it was not a config error. Diagnosed
+# from the browser: POST to /wday/cxs/mitre/MITRE/jobs answers 200 with
+# {"total":0,"jobPostings":[]}, the site page itself renders "0 JOBS FOUND -
+# There are no job openings at this time", and every other site path on that
+# tenant (External, Careers, MITRE_Careers, ...) 404s. The tenant is simply
+# empty; MITRE moved to careers.mitre.org. See the phenom block below.
+- token: draper                       # Draper Laboratory
+  host: draper.wd5.myworkdayjobs.com
+  site: Draper_Careers
+  search: intern
+- token: aero                         # The Aerospace Corporation (FFRDC)
+  host: aero.wd5.myworkdayjobs.com    # carried over from JobAgent, already proven there
+  site: External
+  search: intern
+- token: citjpl                       # NASA JPL / Caltech (FFRDC)
+  host: citjpl.wd5.myworkdayjobs.com  # carried over from JobAgent, already proven there
+  site: Jobs
+  search: intern
+
+phenom:
+# MITRE's real board: ~318 postings, 10 per page, ?from=N&s=1 pages correctly,
+# and each posting's own page carries the full description.
+#
+# NO `keywords` here, deliberately. It was set to "intern" on the assumption
+# that it filters server-side. It does not -- it re-ranks by relevance and
+# still returns everything, so a paged run stops partway through an order that
+# shifts between runs. Two runs on 2026-09-19 pulled 210 and then 263 postings
+# from the same unchanged board, and 33 rows were retired as "gone" that had
+# never actually disappeared. That churn corrupts the one signal a daily
+# collector exists to produce.
+#
+# Cost of pulling the whole board instead: about 100 extra detail fetches,
+# once a day. Worth it for a stable set.
+- token: mitre
+  host: careers.mitre.org
+
+mathjobs:
+# mathjobs.org's public JSON feed (no key). Verified live 2026-09-14: tenant
+# 1857 is IDA, and its one open listing is CCR Princeton research staff, which
+# names SCAMP in the body and carries a real deadline of 15 Nov 2026.
+# Find another employer's tenant id by opening its mathjobs page and clicking
+# the small "position listing in reusable JSON format" icon -- the number in
+# that URL is the tenant.
+- token: ida
+  tenant: 1857                        # Institute for Defense Analyses (CCR/CCS)
+# Whole-board sweep. `search` matches the position title, not the body, so keep
+# it broad -- "research staff" returned nothing, "summer" returned three.
+- token: mathjobs-summer
+  search: summer
+- token: mathjobs-intern
+  search: internship
+
+usajobs:
+# The federal route; NSA's internship programs post here. Needs the free key
+# and email pasted at the top of collect.py -- until then this source errors
+# out in the fetch log each run and nothing else is affected.
+# UNTESTED: written against the documented API shape, never executed, because
+# no key was available when it was written.
+- token: usajobs-math
+  keyword: mathematics
+  results: 250
+- token: usajobs-cryptanalysis
+  keyword: cryptanalysis
+  results: 250
+
+# --- NOT included, and why -------------------------------------------------
+# These employers run the math-PhD internships you actually want, but none of
+# them is reachable by the six fetchers in collect.py. Adding them means
+# writing a fetcher, not editing this file:
+#
+#   Sandia, LLNL, LANL, ORNL, PNNL,    each lab's own portal (Taleo/iCIMS variants)
+#     Brookhaven, Argonne, INL, NREL   -- still the open gap, one fetcher each
+#   Jane Street, Citadel, Two Sigma,   own application portals, no public ATS API
+#     D. E. Shaw, SIG
+#   Flatiron Institute / Simons        Interfolio
+#   NVIDIA                             Eightfold
+#
+# Highest-value single addition: a mathjobs.org fetcher. IDA posts SCAMP there,
+# and it is where math-PhD research positions are advertised as a category
+# rather than scattered across company boards.

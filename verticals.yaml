@@ -1,0 +1,301 @@
+# verticals.yaml -- RESEARCH search (C:\Projects\Research)
+#
+# Scope: math-PhD internships and quantitative research. This is a different
+# employer population from C:\Projects\JobAgent, so this file shares nothing
+# with that one beyond the format.
+#
+# NOTE: title_only_terms is NOT used here. The collect.py in this folder
+# (2026-09-03) does not implement it -- score_vertical reads only spec["terms"]
+# -- so a title_only_terms block would be silently ignored. Everything below
+# works on the terms/min_score/exclude_titles features this collect.py has.
+#
+# min_score = how many times terms must appear in the body. A posting whose
+# TITLE contains a term matches regardless of score.
+#
+# --- how internships are isolated -------------------------------------------
+# `internship` is its own vertical rather than a term inside the research
+# blocks, because "Internship" in a title would otherwise pull Marketing
+# Internship into quant_research. The target posting matches TWO verticals:
+#   internship AND (math_research OR quant_research OR ml_research)
+# Query that intersection at report time:
+#   SELECT p.title, p.company, p.url FROM postings p
+#   JOIN matches a ON a.key=p.key AND a.vertical='internship'   AND a.matched=1
+#   JOIN matches b ON b.key=p.key AND b.vertical='quant_research' AND b.matched=1;
+# The overlap is also the signal itself -- a posting in all three research
+# verticals is the bullseye.
+
+_exclude_titles:
+  # pre-sales / GTM
+  - sales engineer
+  - solutions engineer
+  - solutions architect
+  - account executive
+  - account manager
+  - business development
+  - customer success
+  # marketing / recruiting -- "research" in these titles is a different job
+  - market research
+  - marketing manager
+  - marketing specialist
+  - product marketing
+  - recruiter
+  - sourcer
+  - talent acquisition
+  # research-titled roles that are not research positions
+  - research administrator
+  - research coordinator
+  - research nurse
+  - clinical research
+  - research compliance
+  - user research
+  - ux research
+  - user experience research
+  - survey research
+  - research librarian
+  - research technician
+
+internship:
+  label: Internship / student program
+  # Gate vertical. Combine with a research vertical at query time.
+  #
+  # "intern" and "internship" are separate entries on purpose: collect.py's
+  # term_re applies word boundaries, so \bintern\b does NOT match "Internship".
+  # Title forms in the wild run from "Quantitative Research Intern" to
+  # "2027 Internship - Quantitative Researcher (PhD)" -- both must hit.
+  #
+  # min_score 3: an internship body says intern/student/summer repeatedly;
+  # a full-time posting mentions "our internship program" once in boilerplate.
+  min_score: 3
+  terms:
+    - intern
+    - interns
+    - internship
+    - internships
+    - summer intern
+    - summer internship
+    - summer associate
+    - summer analyst
+    - summer program
+    - summer research
+    - co-op
+    - coop
+    - campus
+    - student program
+    - phd student
+    - doctoral student
+    - graduate student
+    - currently enrolled
+    - rising
+    - "2027"
+    - summer 2027
+  exclude_titles:
+    # student jobs that are not research
+    - intern - marketing
+    - marketing intern
+    - sales intern
+    - hr intern
+    - recruiting intern
+
+math_research:
+  label: Mathematics / statistics research
+  # The math-PhD signal. Terms are the vocabulary a posting uses when the work
+  # is actually mathematical, not when it merely says "PhD in a quantitative
+  # field preferred" -- that phrase is on half the postings in this corpus and
+  # is deliberately absent from the list.
+  #
+  # min_score raised 3 -> 5 after the first live run (2026-09-14, 1972
+  # postings). At 3, HRT's shared company blurb carried every hardware and
+  # software posting on that board into this vertical. Nothing real was lost:
+  # actual math roles hit on the title, and the body-only survivors score 5-7.
+  min_score: 5
+  terms:
+    # -- the field by name
+    - mathematics
+    - mathematical
+    - mathematician
+    - applied mathematics
+    - computational mathematics
+    - discrete mathematics
+    - pure mathematics
+    # -- probability and stochastics
+    - probability theory
+    - stochastic process
+    - stochastic processes
+    - stochastic calculus
+    - stochastic modeling
+    - measure theory
+    - markov chain
+    - martingale
+    - monte carlo
+    - random matrix
+    # -- statistics
+    - statistical inference
+    - mathematical statistics
+    - bayesian
+    - hypothesis testing
+    - experimental design
+    - causal inference
+    - time series analysis
+    - high-dimensional
+    - asymptotic
+    # -- algebra, combinatorics, geometry
+    - combinatorics
+    - combinatorial
+    - graph theory
+    - number theory
+    - group theory
+    - representation theory
+    - algebraic geometry
+    - algebraic structures
+    - topology
+    - topological
+    # -- analysis and numerics
+    - numerical analysis
+    - numerical methods
+    - functional analysis
+    - harmonic analysis
+    - partial differential equation
+    - differential equations
+    - spectral methods
+    - dynamical systems
+    - ergodic
+    # -- optimization / OR
+    - convex optimization
+    - nonconvex
+    - integer programming
+    - linear programming
+    - operations research
+    - combinatorial optimization
+    - stochastic optimization
+    # -- crypto / information theory
+    - cryptography
+    - cryptanalysis
+    - cryptologic
+    - coding theory
+    - information theory
+    - number-theoretic
+    # -- research-institute vocabulary (added 2026-09-14)
+    # A defense/FFRDC math posting names the field and the working style, not
+    # subfields: the IDA/CCR Princeton listing scores only 4 on the subfield
+    # terms above -- below min_score -- and would have been missed. These six
+    # lift it to 10. Measured against the 1,972-posting corpus first: together
+    # they add at most 4 to any existing quant posting, not enough to flip one.
+    - research staff
+    - signals analysis
+    - applied mathematical
+    - mathematical problems
+    - research ability
+    - mathematician
+    # -- research practice
+    - theorem
+    - proofs
+    - peer-reviewed
+    - publications in
+    - open research problems
+
+quant_research:
+  label: Quantitative research (finance)
+  # min_score raised 2 -> 4 after the first live run. At a quant firm EVERY
+  # posting's body talks about trading and research, so 2 was pulling in
+  # "Technology Intern", "Campus C++ Software Engineer (Intern)" and the
+  # Shanghai software-developer internships. Explicit quant titles are
+  # unaffected -- a title hit short-circuits the score.
+  min_score: 4
+  terms:
+    - quantitative research
+    - quantitative researcher
+    - quant research
+    - quant researcher
+    - quantitative strategist
+    - quantitative trading
+    - quantitative trader
+    - quant trader
+    - quantitative analyst
+    - systematic trading
+    - systematic strategies
+    - alpha research
+    - alpha signal
+    - alpha generation
+    - signal research
+    - trading signal
+    - trading strategies
+    - statistical arbitrage
+    - market microstructure
+    - order book
+    - limit order
+    - execution algorithm
+    - market making
+    - high frequency trading
+    - mid-frequency
+    - low-latency trading
+    - derivatives pricing
+    - option pricing
+    - options pricing
+    - volatility surface
+    - stochastic volatility
+    - implied volatility
+    - term structure
+    - portfolio optimization
+    - portfolio construction
+    - factor model
+    - risk model
+    - backtest
+    - backtesting
+    - sharpe
+    - pnl
+    - p&l
+  exclude_titles:
+    # fundamental / discretionary finance research -- reads on the same boards
+    # but is not quantitative work
+    - equity research analyst
+    - credit research analyst
+    - fundamental research
+    - investment analyst
+    - investor relations
+    - research sales
+
+ml_research:
+  label: ML / AI research
+  # Half the verified boards post AI research internships alongside the quant
+  # ones, and they draw the same candidate pool. Overlap with math_research is
+  # expected: math_research catches the mathematics, this catches whether the
+  # role is a research position rather than a production ML job.
+  min_score: 3
+  terms:
+    # Title forms first. The dry run on real titles showed that without these,
+    # "Machine Learning Researcher - Intern" and "Research Internship, OLMo"
+    # match `internship` and nothing else -- the research half was invisible.
+    - machine learning research
+    - machine learning researcher
+    - ml researcher
+    - ai research
+    - ai researcher
+    - research internship
+    - research scientist
+    - research engineer
+    - research intern
+    - research fellow
+    - applied scientist
+    - deep learning
+    - reinforcement learning
+    - representation learning
+    - generative model
+    - large language model
+    - language models
+    - transformer architecture
+    - pretraining
+    - pre-training
+    - fine-tuning
+    - foundation model
+    - neural network
+    - computer vision
+    - natural language processing
+    - first-author
+    - first author
+    - publication record
+    - neurips
+    - icml
+    - iclr
+    - arxiv
+    - research agenda
+    - open problems

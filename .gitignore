@@ -1,0 +1,10 @@
+# Collected data -- rebuilt by every run, and it is a record of one person's
+# job search rather than something anyone else can use.
+jobs.db
+jobs.db-journal
+*.csv
+
+# Environment
+.venv/
+__pycache__/
+*.pyc
