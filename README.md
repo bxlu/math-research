@@ -48,16 +48,107 @@ WHERE p.is_live = 1;
 | `phenom` | Phenom People career sites; results are server-rendered into the page, so the JSON is lifted out of the HTML |
 | `usajobs` | Federal listings; needs a free API key |
 
-## Running it
+## Getting started
+
+Developed and run on Python 3.14. Nothing in the code uses version-specific
+syntax, so 3.9 or newer should be fine.
+
+**1. Get the code**
 
 ```
-python collect.py                      # defaults: jobs.db, companies.yaml, verticals.yaml
-python peek.py --tier 1 --us           # the shortlist
-python peek.py --counts                # per-board totals, and which boards returned nothing
-python peek.py --rejected              # scored but did not match — tune terms here
+git clone https://github.com/bxlu/math-research.git
+cd math-research
 ```
 
-`peek.py` is standard library only. `collect.py` needs `requests` and `pyyaml`.
+**2. Create a virtual environment**
+
+Windows:
+
+```
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install --upgrade pip
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+macOS / Linux:
+
+```
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+Two dependencies, `requests` and `PyYAML`. `peek.py` is standard library only,
+so you can read results with a bare `python peek.py` even outside the venv.
+
+**3. First run**
+
+```
+.venv\Scripts\python.exe collect.py          # Windows
+.venv/bin/python collect.py                  # macOS / Linux
+```
+
+This creates `jobs.db` in the same folder and prints a line per board, e.g.
+`greenhouse/jumptrading: 58 matched of 110`. Expect roughly 2,000-2,500
+postings across the configured boards. The first run takes a while — the
+Workday and Phenom boards need one extra request per posting to get the body —
+and later runs are no faster, since the whole corpus is re-read each time to
+detect edits and disappearances.
+
+Two lines in the output are normal on a fresh checkout:
+
+```
+! usajobs/usajobs-math: USAJOBS_KEY/USAJOBS_EMAIL not set
+```
+
+That source is skipped until you paste a free key into the constants at the top
+of `collect.py`. Everything else runs regardless.
+
+**4. Read the results**
+
+```
+python peek.py --tier 1 --us     # PhD-track research internships, US locations
+python peek.py --counts          # per-board totals; flags boards that returned nothing
+python peek.py --rejected        # scored but did not match — tune terms here
+python peek.py --new 7           # only postings first seen in the last week
+```
+
+**5. Make it daily (optional)**
+
+History is the point — a posting that appears and vanishes is a signal you only
+see across runs. Schedule it once a day.
+
+Windows, using Task Scheduler:
+
+```
+schtasks /create /tn "Research job collector" /sc daily /st 19:00 ^
+  /tr "cmd /c cd /d C:\path\to\math-research && .venv\Scripts\python.exe collect.py"
+```
+
+macOS / Linux, in `crontab -e`:
+
+```
+0 19 * * *  cd /path/to/math-research && .venv/bin/python collect.py
+```
+
+## Making it yours
+
+The two config files are the whole interface; `collect.py` should not need
+editing to retarget this.
+
+- **Different employers** — edit `companies.yaml`. Each block is one fetcher.
+  A greenhouse entry is just the token from a board URL
+  (`job-boards.greenhouse.io/<token>`); verify it by opening
+  `https://boards-api.greenhouse.io/v1/boards/<token>/jobs` in a browser before
+  adding it, since a wrong token returns 404 and a run logs it as an error.
+- **Different field** — edit `verticals.yaml`. Each block is a label, a
+  `min_score`, and a term list. A posting matches a vertical if its title
+  contains a term, or its body contains terms `min_score` times. Delete the
+  blocks you do not want and write your own; `collect.py` reads whatever is
+  there.
+- **Check your work** — `peek.py --rejected` shows postings that scored but
+  fell short. If real roles are sitting in that list, your `min_score` is too
+  high or your terms miss the vocabulary that board actually uses.
 
 ## Tuning notes
 
