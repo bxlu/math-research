@@ -84,6 +84,18 @@ workday:
   host: citjpl.wd5.myworkdayjobs.com  # carried over from JobAgent, already proven there
   site: Jobs
   search: intern
+# --- DOE labs, added 2026-09-26 ---------------------------------------------
+# Unlike the entries above, these two WERE verified against the cxs API itself:
+# POSTed to /wday/cxs/<tenant>/<site>/jobs from the browser and read the
+# response. Counts are what those calls returned.
+- token: bnl                          # Brookhaven National Laboratory -- 57 postings
+  host: bnl.wd1.myworkdayjobs.com
+  site: Externa                       # not a typo and not "External", which 404s
+- token: argonne                      # Argonne National Laboratory -- 92 postings
+  host: argonne.wd1.myworkdayjobs.com
+  site: Argonne_Careers
+# No `search:` on these two. They are small boards where the whole thing is
+# worth reading, and the key is inert anyway until fetch_workday is changed.
 
 phenom:
 # MITRE's real board: ~318 postings, 10 per page, ?from=N&s=1 pages correctly,
@@ -132,17 +144,25 @@ usajobs:
   results: 250
 
 # --- NOT included, and why -------------------------------------------------
-# These employers run the math-PhD internships you actually want, but none of
-# them is reachable by the six fetchers in collect.py. Adding them means
-# writing a fetcher, not editing this file:
+# Surveyed 2026-09-26. The DOE labs are not one fetcher each, as first assumed
+# -- they cluster, and two of them needed no code at all (see the workday block
+# above). What is left:
 #
-#   Sandia, LLNL, LANL, ORNL, PNNL,    each lab's own portal (Taleo/iCIMS variants)
-#     Brookhaven, Argonne, INL, NREL   -- still the open gap, one fetcher each
+#   PNNL          iCIMS, and split across THREE portals: careers-pnnl,
+#                 postdoc-pnnl and universityrecruiting-pnnl. The last is where
+#                 internships live. iCIMS is common across labs and
+#                 universities, so this fetcher is the one that goes furthest.
+#   Sandia, LANL  both on the .jobs network (sandia.jobs, lanl.jobs) --
+#                 one fetcher covers the pair.
+#   LLNL, ORNL    own portals, not yet identified.
+#   INL, NREL     not surveyed.
+#
 #   Jane Street, Citadel, Two Sigma,   own application portals, no public ATS API
-#     D. E. Shaw, SIG
+#     D. E. Shaw, SIG                  -- no fetcher can reach these
 #   Flatiron Institute / Simons        Interfolio
 #   NVIDIA                             Eightfold
 #
-# Highest-value single addition: a mathjobs.org fetcher. IDA posts SCAMP there,
-# and it is where math-PhD research positions are advertised as a category
-# rather than scattered across company boards.
+# Before writing a fetcher for any employer, check whether it is simply on an
+# ATS already supported. Brookhaven and Argonne were both assumed to need one
+# and turned out to be four lines of config; MITRE's move to Phenom was found
+# the same way.
