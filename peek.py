@@ -11,6 +11,7 @@ is fine too.
     python peek.py --company imc
     python peek.py --rejected      # scored but did not match -- tune terms here
     python peek.py --counts        # per-vertical and per-company totals
+    python peek.py --csv today.csv # same rows, as a file
 
 The default view is the intersection this search was built around: a posting
 that matched `internship` AND at least one of math_research / quant_research /
@@ -19,6 +20,7 @@ role and a marketing internship both fail the same test.
 """
 
 import argparse
+import csv
 import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -64,7 +66,7 @@ def connect(path):
 def targets(c, args):
     q = """
     select distinct p.key, p.company, p.title, p.location, p.url,
-           p.posted_at, p.first_seen,
+           p.posted_at, p.first_seen, p.body,
            (select group_concat(m2.vertical) from matches m2
              where m2.key = p.key and m2.matched = 1) as verticals
     from postings p
@@ -83,6 +85,8 @@ def targets(c, args):
         rows = [r for r in rows if US.search(r["location"] or "")]
     for r in rows:
         r["tier"] = tier(r["title"], "2027" in r["title"])
+        m = re.search(r"Application deadline: ([^.]+)\.", r.pop("body", "") or "")
+        r["deadline"] = m.group(1).strip() if m else ""
     if args.tier:
         rows = [r for r in rows if r["tier"] == args.tier]
     rows.sort(key=lambda r: (r["tier"], r["company"], r["title"]))
@@ -104,6 +108,38 @@ def show(rows):
               f"{r['title'].strip()[:52]:54} [{vs}]")
         print(f"      {r['url']}")
     print(f"\n{len(rows)} postings")
+
+
+def write_csv(rows, path):
+    """Same rows the screen view shows, as a file you can sort and annotate.
+
+    The shortlist used to be produced by a throwaway script, which meant it
+    could not be regenerated after the corpus moved. It is a flag now so the
+    file is always reproducible from whatever is in the DB.
+    """
+    cols = ["tier", "company", "title", "location", "verticals",
+            "posted", "first_seen", "deadline", "url"]
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=cols)
+        w.writeheader()
+        for r in rows:
+            vs = ",".join(sorted(v.split("_")[0]
+                                 for v in (r["verticals"] or "").split(",")
+                                 if v != "internship"))
+            w.writerow({
+                "tier": r["tier"],
+                "company": r["company"],
+                "title": r["title"].strip(),
+                "location": r["location"] or "",
+                "verticals": vs,
+                "posted": (r["posted_at"] or "")[:10],
+                "first_seen": (r["first_seen"] or "")[:10],
+                # mathjobs is the only source that states one; the fetcher
+                # prefixes it onto the body, so read it back out of there.
+                "deadline": r["deadline"] or "",
+                "url": r["url"],
+            })
+    print(f"{len(rows)} postings -> {path}")
 
 
 def rejected(c, limit):
@@ -166,6 +202,8 @@ if __name__ == "__main__":
     p.add_argument("--rejected", action="store_true")
     p.add_argument("--counts", action="store_true")
     p.add_argument("--limit", type=int, default=40)
+    p.add_argument("--csv", metavar="PATH",
+                   help="write the same rows to a CSV instead of the screen")
     a = p.parse_args()
 
     conn = connect(a.db)
@@ -174,4 +212,8 @@ if __name__ == "__main__":
     elif a.rejected:
         rejected(conn, a.limit)
     else:
-        show(targets(conn, a))
+        rows = targets(conn, a)
+        if a.csv:
+            write_csv(rows, a.csv)
+        else:
+            show(rows)
