@@ -107,10 +107,11 @@ of `collect.py`. Everything else runs regardless.
 **4. Read the results**
 
 ```
+python peek.py                   # everything in the intersection
 python peek.py --tier 1 --us     # PhD-track research internships, US locations
+python peek.py --new 7           # only postings first seen in the last week
 python peek.py --counts          # per-board totals; flags boards that returned nothing
 python peek.py --rejected        # scored but did not match — tune terms here
-python peek.py --new 7           # only postings first seen in the last week
 ```
 
 **5. Make it daily (optional)**
@@ -149,6 +150,40 @@ editing to retarget this.
 - **Check your work** — `peek.py --rejected` shows postings that scored but
   fell short. If real roles are sitting in that list, your `min_score` is too
   high or your terms miss the vocabulary that board actually uses.
+
+## Getting a shortlist
+
+`peek.py` prints the intersection to the screen; `--csv` writes the same rows to
+a file you can sort and annotate.
+
+```
+python peek.py --csv shortlist.csv          # everything, ~120 rows
+python peek.py --tier 1 --us --csv t1.csv   # just the strongest matches
+```
+
+Filters compose, and they all apply to both views: `--tier`, `--us`,
+`--new DAYS`, `--company NAME`.
+
+Columns are tier, company, title, location, verticals, posted, first_seen,
+deadline, url. `deadline` is only populated where the posting states one — at
+time of writing mathjobs is the only source that does, so expect most rows to be
+blank rather than reading a blank as "no deadline".
+
+Tiers are assigned from the **title** alone:
+
+| Tier | Meaning |
+|---|---|
+| 1 | Internship, research, PhD named, 2027 — the strongest signal a title can carry |
+| 2 | Research internship with no degree named, so PhD-eligible |
+| 3 | Research role that is not an internship — full-time, postdoc, staff |
+| 4 | Everything else in the intersection: trading, engineering, adjacent |
+| 5 | Explicitly undergraduate or master's only |
+
+Reading tiers off the title is crude on purpose — a title is never boilerplate,
+whereas bodies at these employers are — but it does misfile things. IDA's SCAMP
+summer program is titled "Adjunct Research Staff Member or Summer Associate",
+which contains no internship word, so it sits in tier 3. **Do not treat tier 1 as
+the whole shortlist.** Skim 2 and 3 as well; they are 57 rows between them.
 
 ## Tuning notes
 
