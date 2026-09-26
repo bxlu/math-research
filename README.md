@@ -167,10 +167,19 @@ scored 4 on subfield terms alone — under threshold, silently dropped. Terms li
 `research staff`, `signals analysis` and `applied mathematical` lift it to 11
 while adding almost nothing to quant postings.
 
-**Phenom's `keywords` re-ranks, it does not filter.** The board still returns
-everything, just in relevance order. Setting it and paging to a limit means each
-run reads a different slice of an unchanged board: two runs pulled 210 then 263
-postings and retired 33 rows that had never disappeared. Leave it unset.
+**Page a re-ranking board by its reported total, not by exhaustion.** Phenom
+re-ranks between requests, so a page part-way through a walk can come back
+entirely made of postings already seen. Reading that as the end of the list ends
+the walk at a different point every night: six consecutive runs collected
+261-284 of MITRE's 326 postings and retired the remainder as "gone", which is
+the one signal a daily collector exists to produce. Every page reports
+`totalHits` — drive the loop off that, tolerate a few barren pages, and
+re-request the offsets that produced them, since advancing past a re-ranked page
+skips whatever it should have shown.
+
+Phenom's `keywords` is part of the same trap: it re-ranks rather than filtering,
+so it does not reduce the work and it makes the order less stable. Leave it
+unset.
 
 **An empty board is not always a broken config.** MITRE's Workday tenant answers
 `200` with `{"total":0,"jobPostings":[]}` and every other site path on it 404s —

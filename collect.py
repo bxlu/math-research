@@ -319,6 +319,11 @@ def fetch_workday(cfg):
 
 MATHJOBS = "https://www.mathjobs.org"
 
+# Consecutive all-duplicate pages tolerated before a paged walk gives up.
+# Above 1 so a mid-walk re-rank does not end the walk; low enough that a
+# site ignoring the offset parameter is still caught quickly.
+BLANK_PAGE_TOLERANCE = 3
+
 
 def fetch_mathjobs(cfg):
     """mathjobs.org (AMS) public JSON feed -- NOT scraped HTML.
@@ -521,11 +526,18 @@ def fetch_phenom(cfg):
     Ten postings per page, paged with ?from=N&s=1. The list carries only a
     teaser, so each posting's own page is fetched for the full description.
 
-    `keywords` RE-RANKS, it does not filter: the board still returns every
-    posting, just in relevance order. Setting it and paging to a limit means
-    each run reads a different slice of a board that has not changed, which
-    shows up as postings vanishing and reappearing. Leave it unset unless you
-    want a ranking, and never combine it with a low max_pages.
+    Paging is driven by `totalHits`, which every page reports, NOT by running
+    until a page brings nothing new. The board re-ranks between requests, so a
+    page part-way through a walk can come back entirely made of postings
+    already seen; treating that as the end of the list stopped runs early at a
+    different point each night. MITRE has 326 postings and six consecutive
+    runs collected 261-284 of them, retiring the remainder as "gone". Pages
+    that add nothing are now tolerated (up to BLANK_PAGE_TOLERANCE in a row)
+    and the walk continues until `totalHits` is reached.
+
+    `keywords` RE-RANKS rather than filtering -- the board still returns
+    everything, just in a different order -- so it does not reduce the work
+    and it makes the ordering less stable. Leave it unset.
     """
     token = cfg["token"]
     host = cfg["host"]
@@ -535,24 +547,27 @@ def fetch_phenom(cfg):
     if cfg.get("keywords"):
         params["keywords"] = cfg["keywords"]
 
-    out, seen, frm = [], set(), 0
-    for _ in range(int(cfg.get("max_pages", 40))):
+    out, seen = [], set()
+    state = {"total": None}
+
+    def read_page(offset):
+        """Fetch one page; return (postings_on_page, newly_added)."""
         q = dict(params)
-        if frm:
-            q.update({"from": frm, "s": 1})
+        if offset:
+            q.update({"from": offset, "s": 1})
         r = requests.get(base, headers=UA, params=q, timeout=TIMEOUT)
         r.raise_for_status()
         blob = _embedded_json(r.text, "eagerLoadRefineSearch") or {}
+        if state["total"] is None and isinstance(blob.get("totalHits"), int):
+            state["total"] = blob["totalHits"]
         jobs = (blob.get("data") or {}).get("jobs") or []
-        if not jobs:
-            break
-        new = 0
+        added = 0
         for j in jobs:
             jid = j.get("jobSeqNo") or j.get("reqId") or j.get("jobId")
             if not jid or jid in seen:
                 continue
             seen.add(jid)
-            new += 1
+            added += 1
             out.append(_std("phenom", token, jid, _text(j.get("title")),
                             _text(j.get("multi_location")
                                   or j.get("cityStateCountry")
@@ -560,10 +575,43 @@ def fetch_phenom(cfg):
                             _text(j.get("jobUrl") or j.get("applyUrl", "")),
                             _strip_html(_text(j.get("descriptionTeaser", ""))),
                             _text(j.get("postedDate"))[:10]))
-        # A site that ignores paging hands back page 1 forever; stop on it.
-        if not new:
+        return len(jobs), added
+
+    frm, blanks, barren = 0, 0, []
+    for _ in range(int(cfg.get("max_pages", 80))):
+        got, added = read_page(frm)
+        if not got:
             break
-        frm += len(jobs)
+        # A page of nothing but already-seen postings means the board re-ranked
+        # mid-walk, not that the list ended. Keep going; give up only if it
+        # keeps happening, which is what a site ignoring `from` looks like.
+        if added:
+            blanks = 0
+        else:
+            blanks += 1
+            barren.append(frm)
+            if blanks >= BLANK_PAGE_TOLERANCE:
+                break
+        frm += got
+        if state["total"] is not None and len(seen) >= state["total"]:
+            break
+        time.sleep(0.2)
+
+    # Advancing past a re-ranked page skips whatever it should have shown, so
+    # the walk can finish short without ever stopping early. Re-request just
+    # those offsets once -- a transient re-rank yields them the second time.
+    total = state["total"]
+    if barren and total is not None and len(seen) < total:
+        for offset in barren:
+            time.sleep(0.2)
+            read_page(offset)
+            if len(seen) >= total:
+                break
+
+    if total is not None and len(seen) < total:
+        print(f"  ! phenom/{token}: collected {len(seen)} of {total} reported "
+              f"postings -- disappearance data for this board is unreliable "
+              f"this run", file=sys.stderr)
 
     stats = new_detail_stats()
     for job in out[:DETAIL_CAP]:
